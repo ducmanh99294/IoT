@@ -32,8 +32,8 @@ exports.sendCommand = async (req, res) => {
 
 exports.controlLight = async (req, res) => {
   const { id } = req.params;      
-  const { command } = req.body;     
-  const normalizedCommand = command?.toUpperCase();
+  const { status } = req.body;     
+  const normalizedCommand = status?.toUpperCase();
 
   if (!["ON", "OFF"].includes(normalizedCommand)) {
     return res.status(400).json({ error: "Command phải là 'ON' hoặc 'OFF'" });
@@ -75,41 +75,120 @@ exports.scheduleLight = (req, res) => {
   const { status, time } = req.body;
 
   const mqttClient = req.app.get("mqttClient");
-  if (!mqttClient.connected) {
-    return res.status(500).json({ message: "MQTT not connected" });
+
+  let targetTime = new Date(time);  // nhận ISO hoặc HH:mm
+
+  if (isNaN(targetTime.getTime())) {
+    return res.status(400).json({ message: "Time không hợp lệ" });
   }
 
-  const [hour, minute] = time.split(":").map(Number);
   const now = new Date();
-  let targetTime = new Date();
-  targetTime.setHours(hour, minute, 0, 0);
-
   if (targetTime <= now) {
     targetTime.setDate(targetTime.getDate() + 1);
   }
+
   const delay = targetTime - now;
   const cmd = status ? "ON" : "OFF";
+  const topic = `home/${id}`;
 
-  setTimeout(async () => {  
-    try {
-      const topic = `home/${id}`;
-      await new Promise((resolve, reject) => {
-        mqttClient.publish(topic, cmd, { qos: 1 }, (error) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve();
-          }
-        });
-      });
-    } catch (error) {
-      console.error('❌ Scheduled task error:', error);
+
+  setTimeout(() => {
+
+    if (!mqttClient.connected) {
+      mqttClient.reconnect();
     }
+
+    mqttClient.publish(topic, cmd, { qos: 1 }, async (error) => {
+      if (error) {
+        console.error("❌ MQTT publish error:", error);
+        return;
+      }
+
+      try {
+        const updated = await Light.findByIdAndUpdate(
+          id,
+          { 
+            status: cmd === "ON",
+            lastUpdated: new Date()
+          },
+          { new: true }
+        );
+
+        console.log("💾 Đã cập nhật trạng thái DB:", {
+          name: updated?.name,
+          status: updated?.status
+        });
+
+      } catch (dbErr) {
+        console.error("❌ Lỗi cập nhật DB:", dbErr);
+      }
+    });
+
   }, delay);
 
   res.json({
     success: true,
-    message: `Đã đặt lịch ${status ? "BẬT" : "TẮT"} đèn lúc ${time}`
+    message: `⏳ Đã đặt lịch ${status ? "Bật" : "Tắt"} vào ${targetTime.toLocaleString()}`,
+  });
+};
+
+exports.scheduleDelay = (req, res) => {
+  const { id } = req.params;
+  const { status, delay } = req.body;
+
+  const mqttClient = req.app.get("mqttClient");
+
+  // FIX QUAN TRỌNG
+  const cmd = status.toLowerCase() === "on" ? "ON" : "OFF";
+
+  const topic = `home/${id}`;
+
+  if (!delay || delay <= 0) {
+    return res.status(400).json({ message: "Delay không hợp lệ" });
+  }
+
+  console.log("⏳ Delay schedule:", { id, delayMs: delay });
+
+  setTimeout(() => {
+    console.log("🔔 Delay triggered:", { topic, cmd });
+
+    if (!mqttClient.connected) {
+      console.log("⚠ MQTT lost connection. Reconnecting...");
+      mqttClient.reconnect();
+    }
+
+    mqttClient.publish(topic, cmd, { qos: 1 }, async (error) => {
+      if (error) {
+        console.log("❌ MQTT publish error:", error);
+        return;
+      }
+
+      console.log(`📡 Đã gửi lệnh ${cmd} đến ${topic}`);
+
+      try {
+        const updated = await Light.findByIdAndUpdate(
+          id,
+          { 
+            status: cmd === "ON",
+            lastUpdated: new Date()
+          },
+          { new: true }
+        );
+
+        console.log("💾 DB updated:", {
+          name: updated?.name,
+          status: updated?.status
+        });
+
+      } catch (dbErr) {
+        console.error("❌ Lỗi cập nhật DB:", dbErr);
+      }
+    });
+  }, delay);
+
+  res.json({
+    success: true,
+    message: `⏳ Đã đặt lịch ${status === "on" ? "BẬT" : "TẮT"} sau ${delay / 1000} giây`
   });
 };
 
