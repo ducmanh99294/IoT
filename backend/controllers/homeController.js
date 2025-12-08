@@ -116,3 +116,17 @@ exports.scheduleLight = (req, res) => {
 exports.test = (req, res) => {
   res.send("Smart Light Controller đang hoạt động ⚙️");
 };
+
+exports.getAllLights = async (req, res) => {
+  try {
+    const lights = await Light.find(); // lấy tất cả đèn
+    res.json({
+      success: true,
+      data: lights
+    });
+  } catch (err) {
+    console.error("Lỗi getAllLight:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+

@@ -1,0 +1,248 @@
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+
+// ---------- CẤU HÌNH ----------
+const char* ssid = "Binh Quan Manh";
+const char* password = "123456789";
+const char* mqtt_server = "192.168.0.5"; 
+
+#define LED_PIN     13  
+#define LDR_AO_PIN  34  
+#define LDR_DO_PIN  27 
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 7*3600, 60000); 
+
+// ---------- TRẠNG THÁI & CẤU HÌNH ---------
+bool lightOn = false;
+String mode = "auto"; 
+String scheduledOn = "22:00";
+String scheduledOff = "06:00";
+int ldrThreshold = 1500; 
+bool useDigitalLDR = false; 
+
+unsigned long lastAOPublish = 0;
+const unsigned long AOPUBLISH_INTERVAL = 15000; 
+unsigned long lastLDRAction = 0;
+const unsigned long LDR_DEBOUNCE = 5000; 
+
+// ---------- MQTT TOPIC ----------
+const char* topic_control = "home/light1";
+const char* topic_status  = "home/light1/status";
+const char* topic_ao      = "home/light1/lux";
+const char* topic_config  = "home/light1/config";
+
+// ---------- HÀM HỖ TRỢ ----------
+void publishStatus(const char* s) {
+  if (client.connected()) {
+    client.publish(topic_status, s);
+    Serial.println("📤 Status: " + String(s));
+  }
+}
+
+String getHHMM() {
+  String t = timeClient.getFormattedTime();
+  return t.substring(0,5);
+}
+
+bool isTimeInRange(const String& current, const String& start, const String& end) {
+  if (start <= end) {
+    return (current >= start && current <= end);
+  } else {
+    return (current >= start || current <= end);
+  }
+}
+
+// ---------- MQTT CALLBACK ----------
+void callback(char* topic, byte* payload, unsigned int length) {
+  String msg;
+  for (unsigned int i=0;i<length;i++) msg += (char)payload[i];
+  Serial.print("📨 MQTT ["); Serial.print(topic); Serial.print("] -> "); Serial.println(msg);
+
+  if (String(topic) == String(topic_control)) {
+    if (msg == "ON") {
+      lightOn = true;
+      digitalWrite(LED_PIN, HIGH);
+      publishStatus("MANUAL:ON");
+      mode = "manual";
+    } else if (msg == "OFF") {
+      lightOn = false;
+      digitalWrite(LED_PIN, LOW);
+      publishStatus("MANUAL:OFF");
+      mode = "manual";
+    } else if (msg.startsWith("SCHEDULE:")) {
+      int p = msg.indexOf(':');
+      String times = msg.substring(p+1);
+      int dash = times.indexOf('-');
+      if (dash>0 && times.length()>=11) {
+        scheduledOn = times.substring(0,5);
+        scheduledOff = times.substring(dash+1, dash+6);
+        Serial.print("⏰ Schedule: "); Serial.print(scheduledOn); Serial.print(" -> "); Serial.println(scheduledOff);
+        publishStatus(("SCHEDULE:"+scheduledOn+"-"+scheduledOff).c_str());
+      }
+    } else if (msg.startsWith("MODE:")) {
+      String m = msg.substring(5);
+      if (m=="auto" || m=="manual") {
+        mode = m;
+        Serial.println("🔧 Mode: " + mode);
+        publishStatus(("MODE:"+mode).c_str());
+      }
+    } else if (msg.startsWith("THRESH:")) {
+      String v = msg.substring(7);
+      int val = v.toInt();
+      if (val>0 && val<4096) {
+        ldrThreshold = val;
+        Serial.print("📊 Threshold: "); Serial.println(ldrThreshold);
+        publishStatus(("THRESH:"+String(ldrThreshold)).c_str());
+      }
+    } else if (msg.startsWith("LDRTYPE:")) {
+      // 🔥 THÊM: chọn loại LDR
+      String t = msg.substring(8);
+      if (t == "analog") {
+        useDigitalLDR = false;
+        publishStatus("LDRTYPE:ANALOG");
+      } else if (t == "digital") {
+        useDigitalLDR = true;
+        publishStatus("LDRTYPE:DIGITAL");
+      }
+    }
+  }
+}
+
+// ---------- KẾT NỐI MQTT ----------
+void reconnect() {
+  while (!client.connected()) {
+    Serial.print("🔌 MQTT connecting...");
+    if (client.connect("esp32_smartlight")) {
+      Serial.println("connected");
+      client.subscribe(topic_control);
+      publishStatus("RECONNECTED");
+      client.publish(topic_config, ("MODE:"+mode).c_str());
+      client.publish(topic_config, ("SCHEDULE:"+scheduledOn+"-"+scheduledOff).c_str());
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" retry in 5s");
+      delay(5000);
+    }
+  }
+}
+
+// ---------- SETUP ----------
+void setup() {
+  Serial.begin(115200);
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, LOW);
+  pinMode(LDR_DO_PIN, INPUT);
+
+  Serial.println("🚀 Starting Smart Light Controller...");
+
+  // WiFi
+  WiFi.begin(ssid, password);
+  Serial.print("📡 Connecting WiFi");
+  while (WiFi.status() != WL_CONNECTED) { 
+    delay(500); 
+    Serial.print(".");
+  }
+  Serial.println("\n✅ WiFi connected, IP: " + WiFi.localIP().toString());
+
+  // NTP & MQTT
+  timeClient.begin();
+  client.setServer(mqtt_server, 1883);
+  client.setCallback(callback);
+  
+  Serial.print("⏰ Syncing time");
+  while (!timeClient.update()) {
+    timeClient.forceUpdate();
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\n✅ Time: " + timeClient.getFormattedTime());
+}
+
+// ---------- CHECK SCHEDULE ----------
+void checkSchedule() {
+  static String lastCheckedMinute = "";
+  String now = getHHMM();
+  
+  if (now != lastCheckedMinute) {
+    lastCheckedMinute = now;
+    
+    if (mode == "auto") {
+      bool shouldBeOn = isTimeInRange(now, scheduledOn, scheduledOff);
+      
+      if (shouldBeOn && !lightOn) {
+        lightOn = true; 
+        digitalWrite(LED_PIN, HIGH);
+        publishStatus("AUTO:ON (Schedule)");
+        Serial.println("💡 Auto ON by Schedule");
+      } else if (!shouldBeOn && lightOn) {
+        lightOn = false; 
+        digitalWrite(LED_PIN, LOW);
+        publishStatus("AUTO:OFF (Schedule)");
+        Serial.println("💡 Auto OFF by Schedule");
+      }
+    }
+  }
+}
+
+// ---------- CHECK LDR ----------
+void checkLDR() {
+  int lux = analogRead(LDR_AO_PIN);
+  int doVal = digitalRead(LDR_DO_PIN);
+  
+  // 🔥 PUBLISH GIÁ TRỊ LDR ĐỂ GIÁM SÁT
+  if (millis() - lastAOPublish > AOPUBLISH_INTERVAL) {
+    lastAOPublish = millis();
+    if (client.connected()) {
+      String ldrMsg = "AO:" + String(lux) + ",DO:" + String(doVal);
+      client.publish(topic_ao, ldrMsg.c_str());
+    }
+  }
+
+  // 🔥 CHỈ XỬ LÝ KHI Ở CHẾ ĐỘ AUTO VÀ ĐỦ THỜI GIAN DEBOUNCE
+  if (mode == "auto" && (millis() - lastLDRAction > LDR_DEBOUNCE)) {
+    bool ldrTriggered = false;
+    
+    if (useDigitalLDR) {
+      // DÙNG LDR DIGITAL
+      ldrTriggered = (doVal == 1);
+    } else {
+      // DÙNG LDR ANALOG
+      ldrTriggered = (lux < ldrThreshold);
+    }
+    
+    // 🔥 CHỈ BẬT/TẮT KHI CÓ THAY ĐỔI TRẠNG THÁI
+    if (ldrTriggered && !lightOn) {
+      lightOn = true;
+      digitalWrite(LED_PIN, HIGH);
+      lastLDRAction = millis();
+      publishStatus("AUTO:ON (LDR)");
+      Serial.println("💡 Auto ON by LDR");
+    } else if (!ldrTriggered && lightOn) {
+      lightOn = false;
+      digitalWrite(LED_PIN, LOW);
+      lastLDRAction = millis();
+      publishStatus("AUTO:OFF (LDR)");
+      Serial.println("💡 Auto OFF by LDR");
+    }
+  }
+}
+
+// ---------- LOOP ----------
+void loop() {
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();
+
+  timeClient.update();
+  checkSchedule();
+  checkLDR();
+
+  delay(200); 
+}

@@ -10,10 +10,12 @@ app.set("mqttClient", mqttClient);
 
 connectDB();
 // Import routes
-const lightDeviceRoutes = require("./routes/deviceRoutes");
-const lightRoutes = require("./routes/lightRoutes")
-app.use("/api", lightDeviceRoutes);
-app.use("/api", lightRoutes);
+const homeRoutes = require("./routes/homeRoutes");
+const userRoutes = require('./routes/userRoutes');
+
+app.use('/api/users', userRoutes);
+app.use("/api", homeRoutes);
+
 // Default route
 app.get("/", (req, res) => {
   res.send("🚀 Smart Light Backend đang chạy!");
