@@ -198,7 +198,7 @@ exports.test = (req, res) => {
 
 exports.getAllLights = async (req, res) => {
   try {
-    const lights = await Light.find(); // lấy tất cả đèn
+    const lights = await Light.find();
     res.json({
       success: true,
       data: lights

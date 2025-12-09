@@ -12,13 +12,15 @@ connectDB();
 // Import routes
 const homeRoutes = require("./routes/homeRoutes");
 const userRoutes = require('./routes/userRoutes');
+const scheduleRoutes = require('./routes/scheduleRoutes');
 
 app.use('/api/users', userRoutes);
+app.use('/api/schedule', scheduleRoutes);
 app.use("/api", homeRoutes);
 
 // Default route
 app.get("/", (req, res) => {
-  res.send("🚀 Smart Light Backend đang chạy!");
+  res.send("Smart Light Backend đang chạy!");
 });
 
 // Start server

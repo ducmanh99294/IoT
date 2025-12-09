@@ -3,15 +3,15 @@ const mongoose = require('mongoose');
 const LightSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: true,       // Tên đèn, ví dụ "light1"
+    required: true,   
   },
   status: {
     type: Boolean,
-    default: false,       // Trạng thái đèn: bật (true) hoặc tắt (false)
+    default: false,      
   },
   brightness: {
     type: Number,
-    default: 0,           // Độ sáng từ 0 đến 100
+    default: 0,         
     min: 0,
     max: 100,
   },

@@ -1,5 +1,5 @@
 const mqtt = require("mqtt");
-
+const scheduleRunner = require("./scheduleRunner");
 const MQTT_BROKER = "mqtt://192.168.0.5";
 const MQTT_PORT = 1883;
 
@@ -7,6 +7,7 @@ const client = mqtt.connect(`${MQTT_BROKER}:${MQTT_PORT}`);
 
 client.on("connect", () => {
   console.log("✅ MQTT connected!");
+  scheduleRunner(client);
   client.subscribe('home/light1/lux');
   client.subscribe("home/light1/status", (err) => {
     if (!err) console.log("📡 Subscribed to home/light1/status");
@@ -27,4 +28,5 @@ client.on('message', (topic, message) => {
   }
   console.log(`📩 MQTT message: ${topic} = ${message.toString()}`);
 });
+
 module.exports = client;
