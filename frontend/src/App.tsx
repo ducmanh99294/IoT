@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, useLocation } from "react-route
 import Home from "./components/Home";
 import Login from "./components/Login";
 import Register from "./components/Register";
-import Header from "./components/Header";
+import Header from "./components/header";
 import Footer from "./components/Footer";
 import Account from "./components/Account";
 import Chatbox from "./components/Chatbox";
