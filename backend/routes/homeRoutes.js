@@ -8,5 +8,7 @@ router.post("/command", deviceController.sendCommand);
 router.post('/lights/:id', deviceController.controlLight);
 
 router.get('/lights', deviceController.getAllLights);
+router.get('/system-chat', deviceController.getSystemChat);
+router.post('/system-comfirm', deviceController.confirmChat);
 
 module.exports = router;

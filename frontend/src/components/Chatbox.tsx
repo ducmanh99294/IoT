@@ -10,6 +10,7 @@ const Chatbox: React.FC<any> = ({ lights, fetchLights }: any) => {
   const [hasUnread, setHasUnread] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [suggest, setSuggest] = useState<any>([]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatboxRef = useRef<HTMLDivElement>(null);
@@ -74,6 +75,15 @@ const Chatbox: React.FC<any> = ({ lights, fetchLights }: any) => {
     scrollToBottom();
   }, [messages, isTyping]);
 
+  useEffect(() => {
+  const interval = setInterval(() => {
+    handleGetStatus();
+  }, 2000);
+
+  return () => clearInterval(interval);
+}, []);
+
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -137,13 +147,13 @@ const Chatbox: React.FC<any> = ({ lights, fetchLights }: any) => {
       }, 100);
     }
   };
-
+  // điều khiểu đèn
   const toggleLight = async (id: string, status: any, name: any) => {
     try {
       const res = await fetch(`${api}/api/lights/${id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ status, name })
       });
 
       if (!res.ok) throw new Error("Failed");
@@ -155,7 +165,7 @@ const Chatbox: React.FC<any> = ({ lights, fetchLights }: any) => {
       return `Không thể kết nối server!, ${err}`;
     }
   };
-
+  // hẹn giờ vào luýc
   const scheduleLight = async (target :any, action:any, time :any) => {
     try {
       const res = await fetch(`http://localhost:3000/api/lights/schedule/${target._id}`, {
@@ -163,6 +173,7 @@ const Chatbox: React.FC<any> = ({ lights, fetchLights }: any) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
         action: action,
+        name: target.name,
         time: time
       })
     });
@@ -180,14 +191,14 @@ const Chatbox: React.FC<any> = ({ lights, fetchLights }: any) => {
       return " Có lỗi xảy ra!";
     }
   }
-
+  // hẹn giờ tắt sau 
   const scheduleDelayLight = async (target: any, status: any, delay: any) => {
     console.log(JSON.stringify({ status, delay }))
     try {
       const res = await fetch(`${api}/api/lights/schedule-delay/${target._id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, delay })
+        body: JSON.stringify({ status, name: target.name, delay })
       });
 
       if (!res.ok) {
@@ -201,7 +212,45 @@ const Chatbox: React.FC<any> = ({ lights, fetchLights }: any) => {
       return "Có lỗi xảy ra!";
     }
   };
+  // lấy trạng thái
+  const handleGetStatus = async () => {
+    try {
+      const res = await fetch(`${api}/api/system-chat`);
+      const data = await res.json();
 
+      if (data?.suggestion) {
+        setSuggest(data.suggestion);
+
+        setMessages(prev => [
+          ...prev,
+          {
+            id: Date.now(),
+            text: data.suggestion,
+            sender: 'assistant',
+            type: 'system',
+            timestamp: new Date()
+          }
+        ]);
+      }
+    } catch (err) {
+      console.log(err);
+    }
+  };
+  // xác nhận bật hay không để dừng hỏi
+  const handleConfirm = async (confirm: any) => {
+    try {
+        await fetch(`${api}/api/system-comfirm`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm })
+        });
+
+      // setSuggest(null);
+    } catch (err) {
+      console.log(err)
+    }
+  }
+  // gửi tin nhắn
   const handleSendMessage = () => {
     if (!inputText.trim()) return;
     
@@ -280,7 +329,7 @@ const Chatbox: React.FC<any> = ({ lights, fetchLights }: any) => {
     // tắt tất cả
     else if (input.includes("tắt tất cả")) {
       for (const light of lights) {
-        await toggleLight(light._id, "off", lights.name);
+        await toggleLight(light._id, "off", light.name);
       }
       response = "🔌 Đã tắt toàn bộ đèn trong nhà!";
     }
@@ -311,6 +360,7 @@ const Chatbox: React.FC<any> = ({ lights, fetchLights }: any) => {
       }
     }
 
+    // đèn còn bật
     else if (input.includes("đèn") || input.includes("còn") || input.includes("đang")) {
 
       // Kiểm tra người dùng nói cả bật và tắt ⇒ mơ hồ
@@ -352,8 +402,33 @@ const Chatbox: React.FC<any> = ({ lights, fetchLights }: any) => {
         ? `Đèn đang bật: ${names}`
         : `Đèn đang tắt: ${names}`;
     }
-
-    //  Lấy trạng thái đèn
+    
+    // thông báo gợi ý
+    else if(suggest.suggestion !== null) {
+      response = suggest.suggestion
+      if(input.includes("có") || input.includes("ok")) {
+         response = "Ok, mình sẽ thực hiện ngay.";
+         if(suggest.includes("bật")) {
+            for (const light of lights) {
+              await toggleLight(light._id, "on", light.name);
+            }
+         } else if(suggest.includes("tắt")) {
+            for (const light of lights) {
+              await toggleLight(light._id, "off", light.name);
+            }
+         }
+        handleConfirm(true)
+      } 
+      else if (input.includes("không") || input.includes("thôi") || input.includes("đừng")) {
+        handleConfirm(false)
+        response = "Được rồi, mình sẽ không hỏi lại trong 30 phút."
+      }
+      else {
+        response = "bạn có muốn hay không"
+      }
+    }
+    
+    //  Lấy trạng tái đèn
     else if (input.includes("trạng thái") || input.includes("đèn")) {
       response = "Trạng thái hệ thống:\n" +
         lights.map((l:any) => `• ${l.name}: ${l.status ? "Bật 🔆" : "Tắt 🌑"}`).join("\n");

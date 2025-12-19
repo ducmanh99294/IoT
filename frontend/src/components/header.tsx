@@ -43,7 +43,7 @@ const Header: React.FC<any> = ({ isAuthPage = false }) => {
   ];
 
   const handleLogout = () => {
-    // TODO: Xử lý logout API
+    localStorage.removeItem("token")
     navigate('/login');
   };
 

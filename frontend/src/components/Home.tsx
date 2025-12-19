@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import '../assets/home.css';
 
 const Home: React.FC<any> = ({ lights, fetchLights, schedule, fetchSchedule }: any) => {
+  const navigate = useNavigate();
 
   const [newSchedule, setNewSchedule] = useState({
     deviceId: '',
@@ -9,16 +11,24 @@ const Home: React.FC<any> = ({ lights, fetchLights, schedule, fetchSchedule }: a
     action: 'bật'
   });
   const [showAddSchedule, setShowAddSchedule] = useState(false);
+  const token = localStorage.getItem("token")
   const api = "http://localhost:3000"
-
+  useEffect(() => {
+    if(!token) {
+      alert("hãy đăng nhập")
+      navigate("/login")
+    }
+  },[])
   // Hàm bật/tắt thiết bị
   const toggleDevice = async (light: any) => {
+      const ValueStatus = !light.status ? "on" : "off"
+    console.log(JSON.stringify({ status: ValueStatus, name: light.name }))
     try {
       const ValueStatus = !light.status ? "on" : "off"
       const res = await fetch(`${api}/api/lights/${light._id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: ValueStatus })
+        body: JSON.stringify({ status: ValueStatus, name: light.name })
       });
 
       if (!res.ok) throw new Error("Failed");

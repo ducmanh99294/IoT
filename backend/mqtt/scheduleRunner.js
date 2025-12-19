@@ -9,13 +9,14 @@ module.exports = (mqttClient) => {
     const schedules = await Schedule.find({
       enabled: true,
       time: currentHHMM
-    });
+    }).populate("lightId");;
 
     for (let sch of schedules) {
-      const topic = `home/${sch.lightId}`;
+      console.log("ĐANG XỬ LÝ LỊCH:", sch);
+      const topic = `home/${sch.lightId.name}/light/cmd`;
       const cmd = sch.action;
 
-      console.log("⏰ ĐANG THỰC HIỆN LỊCH:", currentHHMM, sch);
+      console.log("ĐANG THỰC HIỆN LỊCH:", currentHHMM, sch);
 
       // Gửi lệnh MQTT
       mqttClient.publish(topic, cmd, { qos: 1 });

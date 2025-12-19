@@ -185,9 +185,6 @@ const Login: React.FC = () => {
             Chưa có tài khoản?
             <Link to="/register">Đăng ký ngay</Link>
           </p>
-          <Link to="/" className="forgot-password">
-            ← Quay lại trang chủ
-          </Link>
         </div>
       </div>
     </div>

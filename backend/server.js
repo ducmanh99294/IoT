@@ -5,8 +5,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const mqttClient = require("./mqtt/mqttClient"); 
+const { mqttClient, IoTState } = require("./mqtt/mqttClient");
+
 app.set("mqttClient", mqttClient);
+app.set("IoTState", IoTState);
 
 connectDB();
 // Import routes
@@ -18,6 +20,11 @@ app.use('/api/users', userRoutes);
 app.use('/api/schedule', scheduleRoutes);
 app.use("/api", homeRoutes);
 
+app.use((err, req, res, next) => {
+  console.error("🔥 GLOBAL ERROR:", err);
+  res.status(500).json({ message: "Internal Server Error" });
+});
+
 // Default route
 app.get("/", (req, res) => {
   res.send("Smart Light Backend đang chạy!");
@@ -25,4 +32,4 @@ app.get("/", (req, res) => {
 
 // Start server
 const PORT = 3000;
-app.listen(PORT, () => console.log(`✅ Server chạy tại http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`Server chạy tại http://localhost:${PORT}`));

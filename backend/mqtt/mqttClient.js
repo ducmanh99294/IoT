@@ -1,32 +1,80 @@
 const mqtt = require("mqtt");
 const scheduleRunner = require("./scheduleRunner");
-const MQTT_BROKER = "mqtt://192.168.0.5";
-const MQTT_PORT = 1883;
 
-const client = mqtt.connect(`${MQTT_BROKER}:${MQTT_PORT}`);
+const MQTT_BROKER = "mqtt://192.168.0.2:1883";
 
+// ===== STATE TOÀN CỤC =====
+const IoTState = {
+  ambient: null,
+  light: null,
+
+  chatMessage: '',
+  lastAskedAt: null,
+  confirm: false,
+};
+// ===== MQTT CLIENT ======
+const client = mqtt.connect(MQTT_BROKER);
+
+// ===== HELPER =====
+const COOLDOWN = 30 * 60 * 1000; // 30 phút
+
+const canAskAgain = () => {
+console.log(IoTState)
+
+  if (!IoTState.lastAskedAt) return true;
+  return Date.now() - IoTState.lastAskedAt > COOLDOWN;
+}
+
+const createSystemChat = (suggestion) => {
+  IoTState.chatMessage = {
+    suggestion
+  };
+
+  IoTState.lastAskedAt = Date.now();
+
+  console.log("SYSTEM CHAT:", suggestion);
+}
+
+// ===== MQTT EVENTS =====
 client.on("connect", () => {
-  console.log("✅ MQTT connected!");
+  console.log("MQTT connected!");
+
   scheduleRunner(client);
-  client.subscribe('home/light1/lux');
-  client.subscribe("home/light1/status", (err) => {
-    if (!err) console.log("📡 Subscribed to home/light1/status");
-  });
+
+  client.subscribe([
+    "home/Đèn hành lang/sensor/light",
+    "home/Đèn hành lang/light/status",
+  ]);
 });
 
-client.on('message', (topic, message) => {
-  if (topic === 'home/light1/lux') {
-    const lux = parseFloat(message.toString());
-    console.log(`🌤️ Cường độ ánh sáng: ${lux} lux`);
+client.on("message", (topic, message) => {
+  const payload = message.toString();
+  console.log(`MQTT ${topic}: ${payload}`);
 
-    // Tự động bật/tắt đèn theo ngưỡng ánh sáng
-    if (lux < 300) {
-      client.publish('home/light1', 'ON');
-    } else if (lux > 700) {
-      client.publish('home/light1', 'OFF');
+  // ===== SENSOR =====
+  if (topic === "home/Đèn hành lang/sensor/light") {
+    IoTState.ambient = payload;
+  }
+
+  // ===== LIGHT STATUS =====
+  if (topic === "home/Đèn hành lang/light/status") {
+    IoTState.light = payload;
+  }
+
+  // ===== LOGIC CHAT TỰ ĐỘNG =====
+  if (!IoTState.confirm && canAskAgain()) {
+    if (IoTState.ambient === "dark" && IoTState.light === "OFF") {
+      createSystemChat("Trời tối rồi, bạn có muốn bật đèn không?");
+    }
+
+    if (IoTState.ambient === "bright" && IoTState.light === "ON") {
+      createSystemChat("Trời sáng rồi, bạn có muốn tắt đèn không?");
     }
   }
-  console.log(`📩 MQTT message: ${topic} = ${message.toString()}`);
 });
 
-module.exports = client;
+// ===== EXPORT =====
+module.exports = {
+  mqttClient: client,
+  IoTState,
+};
