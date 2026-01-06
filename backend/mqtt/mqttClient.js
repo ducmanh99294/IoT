@@ -1,7 +1,7 @@
 const mqtt = require("mqtt");
 const scheduleRunner = require("./scheduleRunner");
 
-const MQTT_BROKER = "mqtt://172.20.13.153:1883";
+const MQTT_BROKER = "mqtt://192.168.0.2";
 
 // ===== STATE TOÀN CỤC ======
 const IoTState = {
