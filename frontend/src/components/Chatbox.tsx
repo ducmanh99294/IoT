@@ -17,7 +17,8 @@ const Chatbox: React.FC<any> = ({ lights, fetchLights }: any) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const isInitialMount = useRef(true);
 
-  const api = "http://localhost:3000"
+  const api = "https://iot-1-4t8m.onrender.com"
+  // const api = "http://localhost:3000"
   // Quick actions
   const quickActions: any[] = [
     { id: 1, text: 'Bật đèn phòng khách', command: 'Bật đèn phòng khách', icon: '💡' },

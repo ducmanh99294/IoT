@@ -22,8 +22,9 @@ const Register: React.FC = () => {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [passwordStrength, setPasswordStrength] = useState(0);
+  const api = "https://iot-1-4t8m.onrender.com"
 
-  const api = 'http://localhost:3000'
+  // const api = 'http://localhost:3000'
   // Tính độ mạnh của mật khẩu
   useEffect(() => {
     if (!formData.password) {
