@@ -1,9 +1,9 @@
 const mqtt = require("mqtt");
 const scheduleRunner = require("./scheduleRunner");
 
-const MQTT_BROKER = "mqtt://192.168.0.2:1883";
+const MQTT_BROKER = "mqtt://172.20.13.153:1883";
 
-// ===== STATE TOÀN CỤC =====
+// ===== STATE TOÀN CỤC ======
 const IoTState = {
   ambient: null,
   light: null,
@@ -19,7 +19,6 @@ const client = mqtt.connect(MQTT_BROKER);
 const COOLDOWN = 30 * 60 * 1000; // 30 phút
 
 const canAskAgain = () => {
-console.log(IoTState)
 
   if (!IoTState.lastAskedAt) return true;
   return Date.now() - IoTState.lastAskedAt > COOLDOWN;

@@ -18,7 +18,7 @@ const Home: React.FC<any> = ({ lights, fetchLights, schedule, fetchSchedule }: a
       alert("hãy đăng nhập")
       navigate("/login")
     }
-  },[])
+  },[token])
   // Hàm bật/tắt thiết bị
   const toggleDevice = async (light: any) => {
       const ValueStatus = !light.status ? "on" : "off"

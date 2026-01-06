@@ -2,11 +2,11 @@
 #include <PubSubClient.h>
 
 // ====== WIFI ======
-const char* ssid = "Binh-Quan-Manh";
-const char* password = "123456789";
+const char* ssid = "UDA.TEACHING";
+const char* password = "Faculty@Edu";
 
 // ====== MQTT ======
-const char* mqtt_server = "192.168.0.2";
+const char* mqtt_server = "172.20.13.153";
 const int mqtt_port = 1883;
 const char* CMD_TOPIC    = "home/Đèn hành lang/light/cmd";
 const char* STATUS_TOPIC = "home/Đèn hành lang/light/status";

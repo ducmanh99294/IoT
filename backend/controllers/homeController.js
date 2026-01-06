@@ -29,6 +29,7 @@ exports.sendCommand = async (req, res) => {
   }
 };
 
+// điều khiển đèn
 exports.controlLight = async (req, res) => {
   const { id } = req.params;      
   const { status, name } = req.body;     
@@ -67,6 +68,7 @@ exports.controlLight = async (req, res) => {
   }
 };
 
+//hẹn giờ lúc 
 exports.scheduleLight = (req, res) => {
   const { id } = req.params;
   const { status, name, time } = req.body;
@@ -129,6 +131,7 @@ exports.scheduleLight = (req, res) => {
   });
 };
 
+// hẹn  tăt sau 
 exports.scheduleDelay = (req, res) => {
   const { id } = req.params;
   const { status, name, delay } = req.body;

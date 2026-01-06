@@ -9,12 +9,6 @@ const LightSchema = new mongoose.Schema({
     type: Boolean,
     default: false,      
   },
-  brightness: {
-    type: Number,
-    default: 0,         
-    min: 0,
-    max: 100,
-  },
   lastUpdated: {
     type: Date,
     default: Date.now,    

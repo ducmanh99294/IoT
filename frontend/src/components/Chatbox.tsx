@@ -518,7 +518,7 @@ const Chatbox: React.FC<any> = ({ lights, fetchLights }: any) => {
           onMouseDown={handleMouseDown}
         >
           <div className="chatbox-title">
-            <span>🤖</span>
+            <span></span>
             <div>
               <div>Trợ lý AI</div>
               <div className="chatbox-status">Đang trực tuyến</div>
