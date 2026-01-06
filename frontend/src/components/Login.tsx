@@ -14,7 +14,8 @@ const Login: React.FC = () => {
     rememberMe: false
   });
 
-  const api = 'http://localhost:3000'
+  // const api = 'http://localhost:3000'
+  const api = "https://iot-1-4t8m.onrender.com"
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;

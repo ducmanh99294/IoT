@@ -12,7 +12,9 @@ const Home: React.FC<any> = ({ lights, fetchLights, schedule, fetchSchedule }: a
   });
   const [showAddSchedule, setShowAddSchedule] = useState(false);
   const token = localStorage.getItem("token")
-  const api = "http://localhost:3000"
+  // const api = "http://localhost:3000"
+  const api = "https://iot-1-4t8m.onrender.com"
+  
   useEffect(() => {
     if(!token) {
       alert("hãy đăng nhập")
