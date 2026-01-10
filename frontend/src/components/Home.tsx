@@ -1,104 +1,124 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../assets/home.css';
+import mqttClient from "../services/mqtt";
 
-const Home: React.FC<any> = ({ lights, fetchLights, schedule, fetchSchedule }: any) => {
+const api = import.meta.env.VITE_api || "http://localhost:3000";
+
+const Home = ({
+  lights,
+  setLights,
+  fetchLights,
+  schedule,
+  fetchSchedule,
+}: any) => {
   const navigate = useNavigate();
+  const token = localStorage.getItem("token");
 
-  const [newSchedule, setNewSchedule] = useState({
-    deviceId: '',
-    time: '',
-    action: 'bật'
-  });
+  const userId = "123";
+
   const [showAddSchedule, setShowAddSchedule] = useState(false);
-  const token = localStorage.getItem("token")
-  // const api = "http://localhost:3000"
-  const api = "https://iot-1-4t8m.onrender.com"
-  
+  const [newSchedule, setNewSchedule] = useState({
+    deviceId: "",
+    time: "",
+    action: "ON",
+  });
+
+  /* ===================== MQTT ===================== */
+  useEffect(() => {
+    if (!mqttClient.connected) mqttClient.connect();
+
+    const topic = `iot/status/${userId}/+`;
+    mqttClient.subscribe(topic);
+
+    const onMessage = (topic: string, message: Buffer) => {
+      try {
+        const data = JSON.parse(message.toString());
+        const deviceId = topic.split("/").pop();
+
+        setLights((prev: any[]) =>
+          prev.map((l) =>
+            l._id === deviceId
+              ? { ...l, status: data.status === "on" }
+              : l
+          )
+        );
+      } catch (err) {
+        console.error("MQTT parse error", err);
+      }
+    };
+
+    mqttClient.on("message", onMessage);
+
+    return () => {
+      mqttClient.off("message", onMessage);
+      mqttClient.unsubscribe(topic);
+    };
+  }, []);
+
+  /* ===================== AUTH ===================== */
   useEffect(() => {
     if(!token) {
       alert("hãy đăng nhập")
       navigate("/login")
     }
   },[token])
-  // Hàm bật/tắt thiết bị
-  const toggleDevice = async (light: any) => {
-      const ValueStatus = !light.status ? "on" : "off"
-    console.log(JSON.stringify({ status: ValueStatus, name: light.name }))
-    try {
-      const ValueStatus = !light.status ? "on" : "off"
-      const res = await fetch(`${api}/api/lights/${light._id}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: ValueStatus, name: light.name })
-      });
 
-      if (!res.ok) throw new Error("Failed");
-      await fetchLights();
+  /* ===================== TOGGLE DEVICE ===================== */
+  const toggleDevice = (light: any) => {
+    const newStatus = light.status ? "off" : "on";
 
-    } catch (err) {
-      return `❌ Không thể kết nối server!, ${err}`;
-    }
-  };
+    mqttClient.publish(
+      `iot/command/${userId}/${light._id}`,
+      JSON.stringify({
+        status: newStatus,
+      })
+    );
 
-  // Hàm xóa lịch
-  const deleteSchedule = async (light: any) => {
-    try {
-      const res = await fetch(`${api}/api/schedule/${light._id}`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      if (!res.ok) throw new Error("Failed");
-      await fetchSchedule();
-
-    } catch (err) {
-      return `Không thể kết nối server!, ${err}`;
-    }
-  };
-
-  // Hàm bật/tắt lịch
-  const toggleSchedule = async (light: any) => {
-    try {
-      const res = await fetch(`${api}/api/schedule/${light._id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      if (!res.ok) throw new Error("Failed");
-      await fetchSchedule();
-
-    } catch (err) {
-      return `Không thể kết nối server!, ${err}`;
-    }
-  };
-
-  // Hàm thêm lịch mới
+    console.log("📤 Sent:", newStatus);
+    console.log("📤 Sent at:", `iot/command/${userId}/${light._id}`);
+  }
+/* ===================== SCHEDULE ===================== */
   const handleAddSchedule = async () => {
     try {
       const res = await fetch(`${api}/api/schedule`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          lightId: newSchedule.deviceId,
-          time: newSchedule.time,
-          action: newSchedule.action
-        })
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(newSchedule),
       });
 
       if (!res.ok) throw new Error("Failed");
-      await fetchSchedule();
+      fetchSchedule();
       setShowAddSchedule(false);
     } catch (err) {
-      return `Không thể kết nối server!, ${err}`;
+      alert("Không thể thêm lịch");
     }
+  };
+
+  const toggleSchedule = async (s: any) => {
+    await fetch(`${api}/api/schedule/${s._id}`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    fetchSchedule();
+  };
+
+  const deleteSchedule = async (s: any) => {
+    await fetch(`${api}/api/schedule/${s._id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    fetchSchedule();
   };
 
   // Tính toán thống kê
   const stats = {
-    totalDevices: lights.length,
-    activeDevices: lights.filter((d: any) => d.status === true).length,
-    activeSchedules: schedule.filter((s: any) => s.enabled  === true).length,
+    total: lights.length,
+    active: lights.filter((l: any) => l.status).length,
+    schedules: schedule.filter((s: any) => s.enabled).length,
   };
 
   const lightIsOn = (lights: any[]) => {
@@ -262,19 +282,19 @@ const Home: React.FC<any> = ({ lights, fetchLights, schedule, fetchSchedule }: a
           <div className="stats-grid">
             <div className="stat-card">
               <div className="stat-icon">🔌</div>
-              <div className="stat-value">{stats.totalDevices}</div>
+              <div className="stat-value">{stats.total}</div>
               <div className="stat-label">Thiết bị</div>
             </div>
             
             <div className="stat-card">
               <div className="stat-icon">⚡</div>
-              <div className="stat-value">{stats.activeDevices}</div>
+              <div className="stat-value">{stats.active}</div>
               <div className="stat-label">Đang hoạt động</div>
             </div>
             
             <div className="stat-card">
               <div className="stat-icon">⏰</div>
-              <div className="stat-value">{stats.activeSchedules}</div>
+              <div className="stat-value">{stats.schedules}</div>
               <div className="stat-label">Lịch hẹn</div>
             </div>
           </div>

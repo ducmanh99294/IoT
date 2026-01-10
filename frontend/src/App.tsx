@@ -36,7 +36,7 @@ const App = () => {
   const [schedule, setSchedule] = useState([]);
   const api = "https://iot-1-4t8m.onrender.com"
   // const api = "http://localhost:3000";
-
+// 
   const fetchLights = async () => {
     const res = await fetch(`${api}/api/lights`);
     const data = await res.json();
