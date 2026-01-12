@@ -1,116 +1,118 @@
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <PubSubClient.h>
+#include <ArduinoJson.h>
 
-// ====== WIFI ======
-const char* ssid = "UDA.TEACHING";
-const char* password = "Faculty@Edu";
+/* ================= WIFI ================= */
+const char* WIFI_SSID = "Binh-Quan-Manh";
+const char* WIFI_PASS = "123456789";
 
-// ====== MQTT ======
-const char* mqtt_server = "172.20.13.153";
-const int mqtt_port = 1883;
-const char* CMD_TOPIC    = "home/Đèn hành lang/light/cmd";
-const char* STATUS_TOPIC = "home/Đèn hành lang/light/status";
-const char* SENSOR_TOPIC = "home/Đèn hành lang/sensor/light";
+/* ================= MQTT ================= */
+const char* MQTT_HOST = "b254dad9169a47c5b94f91cb48228f07.s1.eu.hivemq.cloud";
+const int   MQTT_PORT = 8883;
+const char* MQTT_USER = "ducsmanh";
+const char* MQTT_PASS = "AzO932550957";
 
-// ====== PIN ======
-#define LED 26  
-#define DO_CAMBIEN 27
+/* ================= DEVICE ================= */
+#define USER_ID   "123"
+#define DEVICE_ID "light-1"
 
-WiFiClient espClient;
+/* ================= TOPIC ================= */
+String CMD_TOPIC    = "iot/command/" + String(USER_ID) + "/" + String(DEVICE_ID);
+String STATUS_TOPIC = "iot/status/"  + String(USER_ID) + "/" + String(DEVICE_ID);
+
+/* ================= PIN ================= */
+#define RELAY_PIN 26
+
+/* ================= STATE ================= */
+bool lightStatus = false;
+
+/* ================= MQTT CLIENT ================= */
+WiFiClientSecure espClient;
 PubSubClient client(espClient);
 
-// ====== MQTT CALLBACK ======
-void callback(char* topic, byte* message, unsigned int length) {
-  String payload;
-  for (int i = 0; i < length; i++) {
-    payload += (char)message[i];
-  }
-  payload.trim();
-
-  if (String(topic) == CMD_TOPIC) {
-    if (payload == "ON") {
-      digitalWrite(LED, HIGH);
-      client.publish(STATUS_TOPIC, "ON");
-      Serial.println("ĐÈN BẬT");
-    }
-    else if (payload == "OFF") {
-      digitalWrite(LED, LOW);
-      client.publish(STATUS_TOPIC, "OFF");
-      Serial.println("ĐÈN TẮT");
-    }
-  }
-}
-
-// ====== WIFI CONNECT ======
+/* ================= WIFI CONNECT ================= */
 void setup_wifi() {
-  delay(10);
-  Serial.println();
-  Serial.print("Kết nối WiFi: ");
-  Serial.println(ssid);
-
-  WiFi.begin(ssid, password);
+  Serial.print("🔌 Connecting WiFi");
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
 
-  Serial.println("\nWiFi đã kết nối");
-  Serial.print("IP ESP32: ");
+  Serial.println("\n✅ WiFi connected");
   Serial.println(WiFi.localIP());
 }
 
-// ====== MQTT RECONNECT ======
-void reconnect() {
-  while (!client.connected()) {
-    Serial.print("Kết nối MQTT...");
+/* ================= PUBLISH STATUS ================= */
+void publishStatus() {
+  StaticJsonDocument<64> doc;
+  doc["status"] = lightStatus ? "on" : "off";
 
-    if (client.connect("ESP32_DEN_HANH_LANG")) {
-      Serial.println("MQTT connected");
-      client.subscribe(CMD_TOPIC);
-      Serial.print("Subscribe: ");
-      Serial.println(CMD_TOPIC);
+  char buffer[64];
+  serializeJson(doc, buffer);
+
+  client.publish(STATUS_TOPIC.c_str(), buffer, true);
+  Serial.println("📤 Status sent");
+}
+
+/* ================= MQTT CALLBACK ================= */
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  String msg;
+  for (unsigned int i = 0; i < length; i++) {
+    msg += (char)payload[i];
+  }
+
+  Serial.println("📩 " + String(topic) + ": " + msg);
+
+  StaticJsonDocument<128> doc;
+  if (deserializeJson(doc, msg)) return;
+
+  String status = doc["status"];
+
+  if (status == "on") {
+    digitalWrite(RELAY_PIN, HIGH);
+    lightStatus = true;
+  } else {
+    digitalWrite(RELAY_PIN, LOW);
+    lightStatus = false;
+  }
+
+  publishStatus();
+}
+
+/* ================= MQTT RECONNECT ================= */
+void reconnectMQTT() {
+  while (!client.connected()) {
+    Serial.print("🔄 Connecting MQTT...");
+    if (client.connect("ESP32_LIGHT_1", MQTT_USER, MQTT_PASS)) {
+      Serial.println(" ✅ connected");
+      client.subscribe(CMD_TOPIC.c_str());
+      publishStatus();
     } else {
-      Serial.print("MQTT failed, rc=");
-      Serial.print(client.state());
-      Serial.println(" → thử lại sau 5s");
-      delay(5000);
+      Serial.print(" ❌ failed rc=");
+      Serial.println(client.state());
+      delay(3000);
     }
   }
 }
 
-// ====== SETUP ======
+/* ================= SETUP ================= */
 void setup() {
   Serial.begin(115200);
-  pinMode(LED, OUTPUT);
-  digitalWrite(LED, LOW);
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, LOW);
 
   setup_wifi();
-  client.setServer(mqtt_server, mqtt_port);
-  client.setCallback(callback);
+
+  espClient.setInsecure(); // TLS
+  client.setServer(MQTT_HOST, MQTT_PORT);
+  client.setCallback(mqttCallback);
 }
 
-// ====== LOOP ======
+/* ================= LOOP ================= */
 void loop() {
-  if (!client.connected()) {
-    reconnect();
-  }
+  if (!client.connected()) reconnectMQTT();
   client.loop();
-
-  // ====== ĐỌC CẢM BIẾN DO ======
-  static int lastState = -1;
-  int lightState = digitalRead(DO_CAMBIEN);
-
-  if (lightState != lastState) {
-    lastState = lightState;
-
-    if (lightState == LOW) {
-      client.publish(SENSOR_TOPIC, "bright");
-      Serial.println("Trời sáng");
-    } else {
-      client.publish(SENSOR_TOPIC, "dark");
-      Serial.println("Trời tối");
-    }
-  }
-  delay(300);
 }

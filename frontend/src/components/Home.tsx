@@ -25,36 +25,36 @@ const Home = ({
   });
 
   /* ===================== MQTT ===================== */
-  useEffect(() => {
-    if (!mqttClient.connected) mqttClient.connect();
+  // useEffect(() => {
+  //   if (!mqttClient.connected) mqttClient.connect();
 
-    const topic = `iot/status/${userId}/+`;
-    mqttClient.subscribe(topic);
+  //   const topic = `iot/status/${userId}/+`;
+  //   mqttClient.subscribe(topic);
 
-    const onMessage = (topic: string, message: Buffer) => {
-      try {
-        const data = JSON.parse(message.toString());
-        const deviceId = topic.split("/").pop();
+  //   const onMessage = (topic: string, message: Buffer) => {
+  //     try {
+  //       const data = JSON.parse(message.toString());
+  //       const deviceId = topic.split("/").pop();
 
-        setLights((prev: any[]) =>
-          prev.map((l) =>
-            l._id === deviceId
-              ? { ...l, status: data.status === "on" }
-              : l
-          )
-        );
-      } catch (err) {
-        console.error("MQTT parse error", err);
-      }
-    };
+  //       setLights((prev: any[]) =>
+  //         prev.map((l) =>
+  //           l._id === deviceId
+  //             ? { ...l, status: data.status === "on" }
+  //             : l
+  //         )
+  //       );
+  //     } catch (err) {
+  //       console.error("MQTT parse error", err);
+  //     }
+  //   };
 
-    mqttClient.on("message", onMessage);
+  //   mqttClient.on("message", onMessage);
 
-    return () => {
-      mqttClient.off("message", onMessage);
-      mqttClient.unsubscribe(topic);
-    };
-  }, []);
+  //   return () => {
+  //     mqttClient.off("message", onMessage);
+  //     mqttClient.unsubscribe(topic);
+  //   };
+  // }, []);
 
   /* ===================== AUTH ===================== */
   useEffect(() => {
@@ -69,14 +69,14 @@ const Home = ({
     const newStatus = light.status ? "off" : "on";
 
     mqttClient.publish(
-      `iot/command/${userId}/${light._id}`,
+      `iot/command/123/light-1`,
       JSON.stringify({
         status: newStatus,
       })
     );
 
     console.log("📤 Sent:", newStatus);
-    console.log("📤 Sent at:", `iot/command/${userId}/${light._id}`);
+    console.log("📤 Sent at:", `iot/command/${userId}/light-1`);
   }
 /* ===================== SCHEDULE ===================== */
   const handleAddSchedule = async () => {

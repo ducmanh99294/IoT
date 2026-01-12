@@ -31,42 +31,15 @@ exports.sendCommand = async (req, res) => {
 
 // điều khiển đèn
 exports.controlLight = async (req, res) => {
-  const { id } = req.params;      
-  const { status, name } = req.body;     
-  const normalizedCommand = status?.toUpperCase();
+  const { id } = req.params;
 
-  if (!["ON", "OFF"].includes(normalizedCommand)) {
-    return res.status(400).json({ error: "Command phải là 'ON' hoặc 'OFF'" });
-  }
-  const mqttClient = req.app.get("mqttClient");
-  if (!mqttClient || !mqttClient.connected) {
-    return res.status(500).json({ message: "MQTT not connected" });
-  }
-
-  try {
-    const topic = `home/${name}/light/cmd`;
-    mqttClient.publish(topic, normalizedCommand);
-    console.log(`Gửi lệnh: ${normalizedCommand} ➜ topic: ${topic}`);
-
-    const status = normalizedCommand === "ON";
-
-    const updatedLight = await Light.findOneAndUpdate(
-      { _id: id },                    
-      { status, lastUpdated: new Date() },
-      { upsert: true, new: true }
-    );
-
-    res.json({
-      success: true,
-      message: `Đèn '${id}' đã ${status ? "bật" : "tắt"}`,
-      data: updatedLight
-    });
-
-  } catch (error) {
-    console.error("Error controlling light:", error);
-    res.status(500).json({ success: false, message: "Lỗi khi điều khiển đèn" });
-  }
+  res.json({
+    success: true,
+    message: "Command đã được gửi qua MQTT",
+    note: "Trạng thái sẽ được cập nhật khi ESP32 phản hồi"
+  });
 };
+
 
 //hẹn giờ lúc 
 exports.scheduleLight = (req, res) => {

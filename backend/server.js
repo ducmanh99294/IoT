@@ -5,11 +5,19 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const { mqttClient, IoTState } = require("./mqtt/mqttClient");
+// const {  IoTState } = require("./mqtt/mqttClient");
+
+// app.set("mqttClient", mqttClient);
+// app.set("IoTState", IoTState);
+
+// mqtt
+const mqttClient = require("./mqtt/mqttClient");
+const mqttListener = require("./mqtt/mqttListener");
+
+mqttListener(mqttClient);
 
 app.set("mqttClient", mqttClient);
-app.set("IoTState", IoTState);
-
+//-----------------------------------
 connectDB();
 // Import routes
 const homeRoutes = require("./routes/homeRoutes");
