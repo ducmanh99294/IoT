@@ -5,7 +5,7 @@ import Register from "./components/Register";
 import Header from "./components/header";
 import Footer from "./components/Footer";
 import Account from "./components/Account";
-import Chatbox from "./components/Chatbox";
+// import Chatbox from "./components/Chatbox";
 import "./assets/home.css";
 import { useEffect, useState } from "react";
 import mqttClient from "./services/mqtt";
@@ -27,7 +27,7 @@ const MainLayout = ({ lights, schedule, fetchSchedule, fetchLights }: any) => {
       </Routes>
 
       {!shouldHide && <Footer />}
-      {!shouldHide && <Chatbox lights={lights} schedule={schedule} fetchSchedule={fetchSchedule}  fetchLights={fetchLights} />}
+      {/* {!shouldHide && <Chatbox lights={lights} schedule={schedule} fetchSchedule={fetchSchedule}  fetchLights={fetchLights} />} */}
     </>
   );
 };

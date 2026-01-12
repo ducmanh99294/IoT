@@ -76,7 +76,7 @@ const Home = ({
     );
 
     console.log("📤 Sent:", newStatus);
-    console.log("📤 Sent at:", `iot/command/${userId}/light-1`);
+    console.log("📤 Sent at:", `iot/command/123/light-1`);
   }
 /* ===================== SCHEDULE ===================== */
   const handleAddSchedule = async () => {
